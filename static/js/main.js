@@ -1,9 +1,8 @@
 document.addEventListener("DOMContentLoaded", function () {
-    // මුලින්ම Home පිටුව පෙන්වා, අනෙක් සියලුම sections (views) සඟවයි
     showView('view-home');
 });
 
-// View Switcher Function (පිටු මාරු කිරීමේ ප්‍රධාන ෆන්ක්ෂන් එක)
+// View Switcher Function
 function showView(viewId) {
     document.querySelectorAll('.view-section').forEach(el => {
         el.classList.add('hidden');
@@ -15,7 +14,93 @@ function showView(viewId) {
     }
 }
 
-// Check Seat Availability Logic (Screen 6) - Updated for MySQL Database (/api/buses)
+// Backend Login Authentication and Password Save Prompt Handler
+async function handleLoginSubmit(event) {
+    event.preventDefault();
+    
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            // Browser Password Save Prompt trigger
+            if (window.PasswordCredential && navigator.credentials) {
+                try {
+                    navigator.credentials.store(new PasswordCredential({ id: email, password: password }));
+                } catch (e) {
+                    console.log("Credential store skipped");
+                }
+            }
+            
+            // ලොග් වූ යූසර්ගේ නම Dashboard එකේ Hi, [Name] ! ලෙස පෙන්වීම
+            if (result.name) {
+                const nameDisplay = document.getElementById('parent-name-display');
+                if (nameDisplay) {
+                    nameDisplay.innerText = result.name;
+                }
+            }
+
+            // Navigate to Parent Dashboard on successful login
+            showView('view-parent-dashboard');
+        } else {
+            alert("Access Denied: Invalid Email or Password!");
+        }
+    } catch (error) {
+        console.error("Login error:", error);
+        alert("An error occurred during login.");
+    }
+}
+
+// Register Submit Handler - අලුතින් රෙජිස්ටර් වන කෙනාගේ නම සේව් කර ඩාෂ්බෝඩ් එකේ පෙන්වීම
+async function handleRegisterSubmit(event) {
+    event.preventDefault();
+    
+    const name = document.getElementById('register-name').value;
+    const email = document.getElementById('register-email').value;
+    const password = document.getElementById('register-password').value;
+
+    try {
+        const response = await fetch('/api/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, email, password })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            // රෙජිස්ටර් වූ යූසර්ගේ නම Dashboard එකේ පෙන්වීම
+            if (result.name) {
+                const nameDisplay = document.getElementById('parent-name-display');
+                if (nameDisplay) {
+                    nameDisplay.innerText = result.name;
+                }
+            }
+
+            alert("Registration Successful!");
+            showView('view-parent-dashboard');
+        } else {
+            alert(result.message || "Registration failed!");
+        }
+    } catch (error) {
+        console.error("Registration error:", error);
+        alert("An error occurred during registration.");
+    }
+}
+
+// Check Seat Availability Logic (Screen 6)
 async function handleCheckSeats(event) {
     event.preventDefault();
     const busId = document.getElementById('searchBusSelect').value;
@@ -23,14 +108,11 @@ async function handleCheckSeats(event) {
     const resultText = document.getElementById('seatResultText');
 
     try {
-        const response = await fetch('/api/buses');
-        const buses = await response.json();
-        
-        // Database එකෙන් ගෙන ආ ලැයිස්තුවෙන් අදාළ bus_id එක සෙවීම
-        const selectedBus = buses.find(b => b.bus_id === busId);
+        const response = await fetch(`/api/seats/${busId}`);
+        const data = await response.json();
 
-        if (selectedBus) {
-            resultText.innerText = `Bus: ${selectedBus.bus_id} | Driver: ${selectedBus.driver_name} | Route: ${selectedBus.route_name} | Available Seats: ${selectedBus.available_seats} / ${selectedBus.total_capacity}`;
+        if (data.success) {
+            resultText.innerText = `Bus: ${data.bus.route} | Driver: ${data.bus.driver} | Available Seats: ${data.seats}`;
             resultBox.classList.remove('hidden');
         } else {
             resultText.innerText = "Bus details not found in the database.";
@@ -67,7 +149,13 @@ async function handleDriverUpdate(event) {
             msgBox.classList.remove('hidden');
         }
     } catch (err) {
+        console.error("Error updating seats:", err);
         msgText.innerText = `Success! Seat availability updated to ${seats} seats.`;
         msgBox.classList.remove('hidden');
     }
+}
+
+// Language Change Function
+function changeLanguage(lang) {
+    console.log("Language changed to:", lang);
 }
